@@ -72,17 +72,11 @@ class TaskList(base._Widget, base.PaddingMixin, base.MarginMixin):
         self.add_defaults(base.MarginMixin.defaults)
         self._icons_cache = {}
 
-    def box_width(self, text):
-        width, _ = self.drawer.max_layout_size(
-            [text],
-            self.font,
-            self.fontsize
-        )
-        width = width + self.padding_x * 2 + \
-            self.margin_x * 2 + self.borderwidth * 2
-        if width > self.max_title_width:
-            width = self.max_title_width
-        return width
+    def box_width(self):
+        n = len(self.bar.screen.group.windows)
+        if n:
+            return (self.width / n) - (self.padding_x + self.margin_x) * 2 
+        return self.width
 
     def _configure(self, qtile, bar):
         base._Widget._configure(self, qtile, bar)
@@ -100,6 +94,7 @@ class TaskList(base._Widget, base.PaddingMixin, base.MarginMixin):
             self.fontshadow,
             wrap=False
         )
+        self.layout.layout.set_alignment(0) # ALIGN_LEFT
         self.setup_hooks()
 
     def update(self, window=None):
@@ -137,7 +132,7 @@ class TaskList(base._Widget, base.PaddingMixin, base.MarginMixin):
                 width=None, rounded=False, block=False, icon=None):
         self.drawtext(text, textcolor, width)
 
-        icon_padding = (self.icon_size + 4) if icon else 0
+        icon_padding = (self.icon_size + 6) if icon else 0
         padding_x = [self.padding_x + icon_padding, self.padding_x]
 
         framed = self.layout.framed(
@@ -157,8 +152,9 @@ class TaskList(base._Widget, base.PaddingMixin, base.MarginMixin):
     def get_clicked(self, x, y):
         window = None
         new_width = width = 0
+        bw = self.box_width()
         for w in self.bar.screen.group.windows:
-            new_width += self.icon_size + self.box_width(w.name)
+            new_width += bw
             if width <= x <= new_width:
                 window = w
                 break
@@ -177,8 +173,6 @@ class TaskList(base._Widget, base.PaddingMixin, base.MarginMixin):
             window.group.focus(window, False)
             if window.floating:
                 window.cmd_bring_to_front()
-        elif window:
-            window.toggle_minimize()
 
     def get_window_icon(self, window):
         if not window.icons:
@@ -219,7 +213,7 @@ class TaskList(base._Widget, base.PaddingMixin, base.MarginMixin):
         if not surface:
             return
 
-        x = offset + self.padding_x + self.borderwidth + 2 + self.margin_x
+        x = offset + self.padding_x + self.borderwidth + self.margin_x
         y = self.padding_y + self.borderwidth
 
         self.drawer.ctx.save()
@@ -231,7 +225,7 @@ class TaskList(base._Widget, base.PaddingMixin, base.MarginMixin):
     def draw(self):
         self.drawer.clear(self.background or self.bar.background)
         offset = 0
-
+        bw = self.box_width()
         for w in self.bar.screen.group.windows:
             state = ''
             if w is None:
@@ -242,30 +236,20 @@ class TaskList(base._Widget, base.PaddingMixin, base.MarginMixin):
                 state = '_ '
             elif w.floating:
                 state = 'V '
-
             task = "%s%s" % (state, w.name if w and w.name else " ")
 
             if w.urgent:
                 border = self.urgent_border
-                text_color = border
             elif w is w.group.currentWindow:
                 border = self.border
-                text_color = border
             else:
                 border = self.background or self.bar.background
-                text_color = self.foreground
 
-            if self.highlight_method == 'text':
-                border = self.bar.background
-            else:
-                text_color = self.foreground
-
-            bw = self.box_width(task)
             self.drawbox(
                 self.margin_x + offset,
                 task,
                 border,
-                text_color,
+                self.foreground,
                 rounded=self.rounded,
                 block=(self.highlight_method == 'block'),
                 width=(bw - self.margin_x * 2 - self.padding_x * 2),
